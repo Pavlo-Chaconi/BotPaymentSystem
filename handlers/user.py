@@ -219,3 +219,18 @@ async def cb_help(callback: CallbackQuery, state: FSMContext):
     )
     await navigate_to_text(callback, text, back_to_main_kb())
     await callback.answer()
+
+@router.callback_query(F.data == "agreement")
+async def cb_agreement(callback: CallbackQuery, state: FSMContext):
+    await state.clear()
+    text = (
+        "📜 <b>Пользовательское соглашение:</b>\n\n"
+        "1. Сервис предоставляет доступ к VPN «как есть».\n"
+        "2. Возможны временные перебои в работе, связанные с техническими неполадками, "
+        "блокировками со стороны интернет-провайдеров или сбоями магистральных узлов связи.\n"
+        "3. Администрация прикладывает все усилия для оперативного восстановления доступа в случае сбоев.\n"
+        "4. Оплачивая подписку, вы соглашаетесь с тем, что возврат средств за периоды вынужденного простоя не осуществляется.\n\n"
+        "<i>Используя нашего бота, вы подтверждаете согласие с данными условиями.</i>"
+    )
+    await navigate_to_text(callback, text, back_to_main_kb())
+    await callback.answer()

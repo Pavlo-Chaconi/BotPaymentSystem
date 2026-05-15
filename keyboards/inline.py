@@ -4,13 +4,15 @@ def main_menu_kb() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="🛒 Купить подписку", callback_data="buy_sub")],
         [InlineKeyboardButton(text="👤 Мой профиль", callback_data="profile")],
-        [InlineKeyboardButton(text="ℹ️ Помощь", callback_data="help")]
+        [InlineKeyboardButton(text="ℹ️ Помощь", callback_data="help"), InlineKeyboardButton(text="📜 Соглашение", callback_data="agreement")]
     ])
 
 def buy_menu_kb() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="1 Месяц - 100₽", callback_data="tariff_1_100")],
-        [InlineKeyboardButton(text="3 Месяца - 250₽", callback_data="tariff_3_250")],
+        [InlineKeyboardButton(text="1 Месяц - 250₽", callback_data="tariff_1_250")],
+        [InlineKeyboardButton(text="3 Месяца - 700₽", callback_data="tariff_3_700")],
+        [InlineKeyboardButton(text="6 Месяцев - 1350₽", callback_data="tariff_6_1350")],
+        [InlineKeyboardButton(text="12 Месяцев - 2500₽", callback_data="tariff_12_2500")],
         [InlineKeyboardButton(text="◀️ Назад", callback_data="main_menu")]
     ])
 
