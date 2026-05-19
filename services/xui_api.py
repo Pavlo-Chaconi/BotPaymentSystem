@@ -116,18 +116,24 @@ class XuiAPI:
 
     async def get_client_traffic(self, email: str):
         session = await self._get_session()
-        async with session.get(f"{self.base_url}/panel/api/inbounds/getClientTraffics/{email}") as response:
+        async with session.get(f"{self.base_url}/panel/api/inbounds/getClientTraffics") as response:
             if response.status == 200:
                 res = await response.json()
                 if res.get("success") and res.get("obj"):
-                    return res["obj"]
+                    traffics = res["obj"]
+                    for t in traffics:
+                        if t.get("email") == email:
+                            return t
             elif response.status == 401:
                 await self.login()
-                async with session.get(f"{self.base_url}/panel/api/inbounds/getClientTraffics/{email}") as retry_resp:
+                async with session.get(f"{self.base_url}/panel/api/inbounds/getClientTraffics") as retry_resp:
                     if retry_resp.status == 200:
                         retry_res = await retry_resp.json()
                         if retry_res.get("success") and retry_res.get("obj"):
-                            return retry_res["obj"]
+                            traffics = retry_res["obj"]
+                            for t in traffics:
+                                if t.get("email") == email:
+                                    return t
         return None
 
     async def get_inbound_clients(self, inbound_id: int):
