@@ -1,5 +1,4 @@
 import os
-import time
 from datetime import datetime, timedelta
 from aiogram import Router, F, Bot
 from aiogram.types import Message, CallbackQuery, BufferedInputFile, FSInputFile
@@ -8,7 +7,7 @@ from aiogram.fsm.context import FSMContext
 import qrcode
 import io
 
-from database.db import add_user, get_user, get_active_subscription
+from database.db import add_user, get_active_subscription
 from keyboards.inline import main_menu_kb, buy_menu_kb, payment_kb, back_to_main_kb
 from config import ADMIN_ID, SUPPORT_USERNAME
 from utils.states import PaymentStates

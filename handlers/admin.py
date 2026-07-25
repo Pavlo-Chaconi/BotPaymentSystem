@@ -6,7 +6,6 @@ from aiogram.types import CallbackQuery
 from database.db import get_payment, update_payment_status, add_subscription, get_active_subscription, extend_subscription
 from services.xui_api import xui_api
 from config import ADMIN_ID, SUB_URL
-import uuid
 
 router = Router()
 
@@ -40,20 +39,18 @@ async def cb_admin_approve(callback: CallbackQuery, bot: Bot):
     
     if active_sub:
         # Extend existing
-        client_uuid = active_sub['client_uuid']
         email = active_sub['client_email']
         sub_id = active_sub.get('sub_id')
-        
+
         current_expires_at = active_sub['expires_at']
         if current_expires_at and current_expires_at > datetime.now():
             new_expires_at = current_expires_at + timedelta(days=30 * months)
         else:
             new_expires_at = datetime.now() + timedelta(days=30 * months)
-            
+
         new_expiry_ms = int(new_expires_at.timestamp() * 1000)
-        
-        await xui_api.login()
-        success = await xui_api.update_client_expiry(client_uuid, new_expiry_ms)
+
+        success = await xui_api.update_client_expiry(email, new_expiry_ms)
         if success:
             await update_payment_status(payment_id, "successful")
             await extend_subscription(user_id, new_expires_at)
@@ -81,17 +78,16 @@ async def cb_admin_approve(callback: CallbackQuery, bot: Bot):
     else:
         # Create new
         email = f"user_{user_id}_{payment_id}_{int(time.time())}"
-        new_sub_id = str(uuid.uuid4().hex)[:16]
         expires_at = datetime.now() + timedelta(days=30 * months)
         expiry_ms = int(expires_at.timestamp() * 1000)
-        
-        await xui_api.login()
-        client_uuid = await xui_api.add_client(email=email, sub_id=new_sub_id, expiry_time=expiry_ms)
-        
-        if client_uuid:
+
+        created = await xui_api.add_client(email=email, expiry_time=expiry_ms)
+
+        if created:
+            client_uuid, new_sub_id = created
             await update_payment_status(payment_id, "successful")
             await add_subscription(user_id, email, client_uuid, new_sub_id, expires_at)
-            
+
             sub_url = f"{SUB_URL.rstrip('/')}/sub/{new_sub_id}"
             
             success_text = (
@@ -119,7 +115,6 @@ async def cb_admin_approve(callback: CallbackQuery, bot: Bot):
 import csv
 import io
 from aiogram.types import Message
-from config import XUI_INBOUND_ID
 from database.db import import_subscription
 
 @router.message(F.document, F.caption == "/import")
@@ -171,21 +166,20 @@ async def handle_import_csv(message: Message, bot: Bot):
         await msg.edit_text("❌ В файле не найдено корректных данных. Формат: email,telegram_id")
         return
 
-    await msg.edit_text(f"⏳ Получение клиентов из 3x-ui (Inbound ID: {XUI_INBOUND_ID})...")
-    await xui_api.login()
-    xui_clients = await xui_api.get_inbound_clients(XUI_INBOUND_ID)
-    
+    await msg.edit_text("⏳ Получение клиентов из 3x-ui...")
+    xui_clients = await xui_api.list_clients()
+
     if not xui_clients:
-        await msg.edit_text("❌ В 3x-ui не найдено клиентов для этого Inbound.")
+        await msg.edit_text("❌ В 3x-ui не найдено клиентов.")
         return
 
     success_count = 0
     not_found_count = 0
-    
+
     for client in xui_clients:
         email = client.get("email")
         if email in mapping:
-            client_uuid = client.get("id")
+            client_uuid = client.get("uuid")
             sub_id = client.get("subId", "")
             expiry_ms = client.get("expiryTime", 0)
             

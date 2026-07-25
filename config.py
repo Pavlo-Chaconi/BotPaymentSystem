@@ -5,10 +5,11 @@ load_dotenv()
 
 BOT_TOKEN = os.getenv("BOT_TOKEN", "")
 
-# 3x-ui settings
+# 3x-ui settings. XUI_URL must include the panel's webBasePath (Settings ->
+# Security), e.g. https://panel.example.com/<secret-path>. Auth is a Bearer
+# API token (Settings -> Security -> API Token), not username/password.
 XUI_URL = os.getenv("XUI_URL", "https://panel.jewtranstelecom.online/")
-XUI_USERNAME = os.getenv("XUI_USERNAME", "")
-XUI_PASSWORD = os.getenv("XUI_PASSWORD", "")
+XUI_API_TOKEN = os.getenv("XUI_API_TOKEN", "")
 
 # Domain for subscription links (e.g. https://sub.jewtranstelecom.online/)
 SUB_URL = os.getenv("SUB_URL", "https://sub.jewtranstelecom.online/")
@@ -26,6 +27,5 @@ ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
 # Support contact (shown in "Поддержка" button)
 SUPPORT_USERNAME = os.getenv("SUPPORT_USERNAME", "leeengery")
 
-# Platega.io payment gateway (not wired yet, see services/payment_gateway.py)
-PLATEGA_SHOP_ID = os.getenv("PLATEGA_SHOP_ID", "")
-PLATEGA_SECRET_KEY = os.getenv("PLATEGA_SECRET_KEY", "")
+# ponytail: Platega.io integration deferred — add PLATEGA_SHOP_ID/PLATEGA_SECRET_KEY
+# here and a services/payment_gateway.py once we have API docs/creds.

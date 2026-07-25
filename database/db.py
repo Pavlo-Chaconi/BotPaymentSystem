@@ -67,10 +67,6 @@ async def add_user(telegram_id: int, username: str, full_name: str):
             ON CONFLICT (telegram_id) DO NOTHING
         ''', telegram_id, username, full_name)
 
-async def get_user(telegram_id: int):
-    async with pool.acquire() as conn:
-        return await conn.fetchrow('SELECT * FROM users WHERE telegram_id = $1', telegram_id)
-
 async def add_subscription(user_id: int, client_email: str, client_uuid: str, sub_id: str, expires_at):
     async with pool.acquire() as conn:
         await conn.execute('''

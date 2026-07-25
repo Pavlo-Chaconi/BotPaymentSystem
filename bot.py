@@ -16,12 +16,11 @@ async def main():
     # Initialize Database
     await init_db()
     
-    # Login to 3x-ui
-    login_success = await xui_api.login()
-    if login_success:
-        logger.info("Successfully logged in to 3x-ui")
+    # Sanity-check 3x-ui connectivity/token
+    if await xui_api.list_clients():
+        logger.info("3x-ui API reachable")
     else:
-        logger.warning("Failed to login to 3x-ui. Check credentials and URL.")
+        logger.warning("3x-ui API unreachable or returned no clients. Check XUI_URL/XUI_API_TOKEN.")
 
     bot = Bot(token=BOT_TOKEN)
     dp = Dispatcher()
