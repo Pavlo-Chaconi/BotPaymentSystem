@@ -7,8 +7,8 @@ BOT_TOKEN = os.getenv("BOT_TOKEN", "")
 
 # 3x-ui settings
 XUI_URL = os.getenv("XUI_URL", "https://panel.jewtranstelecom.online/")
-XUI_USERNAME = os.getenv("XUI_USERNAME", "JZFpI7mM96")
-XUI_PASSWORD = os.getenv("XUI_PASSWORD", "7y9gEiOwMv")
+XUI_USERNAME = os.getenv("XUI_USERNAME", "")
+XUI_PASSWORD = os.getenv("XUI_PASSWORD", "")
 
 # Domain for subscription links (e.g. https://sub.jewtranstelecom.online/)
 SUB_URL = os.getenv("SUB_URL", "https://sub.jewtranstelecom.online/")
@@ -23,5 +23,9 @@ DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localho
 # Expecting comma separated string of IDs or a single ID
 ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
 
-# Payment Requisites
-PAYMENT_DETAILS = os.getenv("PAYMENT_DETAILS", "Сбербанк / Тинькофф: 0000 0000 0000 0000 (Иван И.)")
+# Support contact (shown in "Поддержка" button)
+SUPPORT_USERNAME = os.getenv("SUPPORT_USERNAME", "leeengery")
+
+# Platega.io payment gateway (not wired yet, see services/payment_gateway.py)
+PLATEGA_SHOP_ID = os.getenv("PLATEGA_SHOP_ID", "")
+PLATEGA_SECRET_KEY = os.getenv("PLATEGA_SECRET_KEY", "")

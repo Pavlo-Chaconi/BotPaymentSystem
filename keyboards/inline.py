@@ -2,9 +2,10 @@ from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 def main_menu_kb() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🛒 Купить подписку", callback_data="buy_sub")],
+        [InlineKeyboardButton(text="🛒 Купить подписку", callback_data="buy_sub"), InlineKeyboardButton(text="💳 Тарифы", callback_data="buy_sub")],
         [InlineKeyboardButton(text="👤 Мой профиль", callback_data="profile")],
-        [InlineKeyboardButton(text="ℹ️ Помощь", callback_data="help"), InlineKeyboardButton(text="📜 Соглашение", callback_data="agreement")]
+        [InlineKeyboardButton(text="ℹ️ Помощь", callback_data="help"), InlineKeyboardButton(text="🆘 Поддержка", callback_data="support")],
+        [InlineKeyboardButton(text="📜 Соглашение", callback_data="agreement"), InlineKeyboardButton(text="📄 Документы", callback_data="docs")]
     ])
 
 def buy_menu_kb() -> InlineKeyboardMarkup:
@@ -32,5 +33,6 @@ def admin_approval_kb(payment_id: int) -> InlineKeyboardMarkup:
 
 def back_to_main_kb() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="📄 Документы", callback_data="docs")],
         [InlineKeyboardButton(text="◀️ Назад", callback_data="main_menu")]
     ])

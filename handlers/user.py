@@ -1,7 +1,8 @@
+import os
 import time
 from datetime import datetime, timedelta
 from aiogram import Router, F, Bot
-from aiogram.types import Message, CallbackQuery, BufferedInputFile
+from aiogram.types import Message, CallbackQuery, BufferedInputFile, FSInputFile
 from aiogram.filters import CommandStart
 from aiogram.fsm.context import FSMContext
 import qrcode
@@ -9,22 +10,46 @@ import io
 
 from database.db import add_user, get_user, get_active_subscription
 from keyboards.inline import main_menu_kb, buy_menu_kb, payment_kb, back_to_main_kb
-from config import PAYMENT_DETAILS, ADMIN_ID
+from config import ADMIN_ID, SUPPORT_USERNAME
 from utils.states import PaymentStates
 from services.xui_api import xui_api
 
 router = Router()
 
+DOCS_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "docs")
+PRIVACY_POLICY_PATH = os.path.join(DOCS_DIR, "privacy_policy.pdf")
+TERMS_OF_SERVICE_PATH = os.path.join(DOCS_DIR, "terms_of_service.pdf")
+
+async def send_docs(chat_id: int, bot: Bot):
+    if os.path.exists(PRIVACY_POLICY_PATH):
+        await bot.send_document(chat_id, FSInputFile(PRIVACY_POLICY_PATH), caption="🔒 Политика конфиденциальности")
+    if os.path.exists(TERMS_OF_SERVICE_PATH):
+        await bot.send_document(chat_id, FSInputFile(TERMS_OF_SERVICE_PATH), caption="📄 Пользовательское соглашение")
+
 @router.message(CommandStart())
-async def cmd_start(message: Message, state: FSMContext):
+async def cmd_start(message: Message, state: FSMContext, bot: Bot):
     await state.clear()
     await add_user(message.from_user.id, message.from_user.username, message.from_user.full_name)
+    await send_docs(message.chat.id, bot)
     welcome_text = (
         "👋 <b>Добро пожаловать в панель управления VPN!</b>\n\n"
         "🛡️ <i>Быстрый, безопасный и анонимный доступ к интернету.</i>\n\n"
+        "Ознакомьтесь с документами выше перед началом работы.\n"
         "Выберите действие в меню ниже 👇"
     )
     await message.answer(welcome_text, reply_markup=main_menu_kb(), parse_mode="HTML")
+
+@router.callback_query(F.data == "docs")
+async def cb_docs(callback: CallbackQuery, bot: Bot):
+    await send_docs(callback.message.chat.id, bot)
+    await callback.answer()
+
+@router.callback_query(F.data == "support")
+async def cb_support(callback: CallbackQuery, state: FSMContext):
+    await state.clear()
+    text = f"🆘 <b>Поддержка</b>\n\nПо всем вопросам пишите: @{SUPPORT_USERNAME}"
+    await navigate_to_text(callback, text, back_to_main_kb())
+    await callback.answer()
 
 async def navigate_to_text(callback: CallbackQuery, text: str, reply_markup):
     # Утилита для переключения между фото и текстом
@@ -64,9 +89,9 @@ async def cb_tariff(callback: CallbackQuery, bot: Bot):
     text = (
         f"📝 <b>Оформление подписки на {months} мес.</b>\n\n"
         f"💳 Сумма к оплате: <b>{price}₽</b>\n\n"
-        f"🏦 Реквизиты для перевода:\n"
-        f"<code>{PAYMENT_DETAILS}</code>\n\n"
-        "<i>После совершения перевода нажмите кнопку «✅ Я оплатил».</i>"
+        f"⚙️ <i>Автоматическая оплата (Platega.io) сейчас подключается.</i>\n"
+        f"Для оплаты свяжитесь с поддержкой (@{SUPPORT_USERNAME}) — вам вышлют актуальные реквизиты.\n\n"
+        "<i>После оплаты нажмите кнопку «✅ Я оплатил» и приложите чек.</i>"
     )
     
     await navigate_to_text(callback, text, payment_kb(price, months))
@@ -215,7 +240,7 @@ async def cb_help(callback: CallbackQuery, state: FSMContext):
         "2️⃣ Зайдите в «Мой профиль» и скопируйте ссылку-подписку (или отсканируйте QR-код).\n"
         "3️⃣ Вставьте ссылку в ваше приложение (в раздел Подписки / Subscriptions).\n"
         "4️⃣ Обновите подписку и подключитесь!\n\n"
-        "💬 Возникли проблемы? Напишите поддержке: @leeengery"
+        f"💬 Возникли проблемы? Напишите поддержке: @{SUPPORT_USERNAME}"
     )
     await navigate_to_text(callback, text, back_to_main_kb())
     await callback.answer()
