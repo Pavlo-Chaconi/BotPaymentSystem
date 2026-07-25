@@ -14,9 +14,6 @@ XUI_API_TOKEN = os.getenv("XUI_API_TOKEN", "")
 # Domain for subscription links (e.g. https://sub.jewtranstelecom.online/)
 SUB_URL = os.getenv("SUB_URL", "https://sub.jewtranstelecom.online/")
 
-# The default inbound ID where clients will be added
-XUI_INBOUND_ID = int(os.getenv("XUI_INBOUND_ID", "1"))
-
 # Database settings
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/bot_db")
 
