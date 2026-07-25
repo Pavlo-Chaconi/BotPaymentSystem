@@ -108,24 +108,34 @@ async def update_payment_status(payment_id: int, status: str):
 
 async def import_subscription(telegram_id: int, client_email: str, client_uuid: str, sub_id: str, expires_at):
     async with pool.acquire() as conn:
-        # Create user if not exists (we only have their ID for now)
-        await conn.execute('''
-            INSERT INTO users (telegram_id, username, full_name)
-            VALUES ($1, $2, $3)
-            ON CONFLICT (telegram_id) DO NOTHING
-        ''', telegram_id, f"user_{telegram_id}", "Imported User")
-        
-        # Insert subscription, updating if it exists
-        await conn.execute('''
-            INSERT INTO subscriptions (user_id, client_email, client_uuid, sub_id, expires_at)
-            VALUES ($1, $2, $3, $4, $5)
-            ON CONFLICT (client_uuid) DO UPDATE 
-            SET user_id = EXCLUDED.user_id, 
-                client_email = EXCLUDED.client_email,
-                sub_id = EXCLUDED.sub_id,
-                expires_at = EXCLUDED.expires_at,
-                status = 'active'
-        ''', telegram_id, client_email, client_uuid, sub_id, expires_at)
+        async with conn.transaction():
+            # Create user if not exists (we only have their ID for now)
+            await conn.execute('''
+                INSERT INTO users (telegram_id, username, full_name)
+                VALUES ($1, $2, $3)
+                ON CONFLICT (telegram_id) DO NOTHING
+            ''', telegram_id, f"user_{telegram_id}", "Imported User")
+
+            # A user has at most one active subscription; importing a different
+            # client for them replaces it instead of leaving two rows active
+            # (extend_subscription updates by user_id+status='active' and would
+            # otherwise touch both).
+            await conn.execute('''
+                UPDATE subscriptions SET status = 'replaced'
+                WHERE user_id = $1 AND status = 'active' AND client_uuid != $2
+            ''', telegram_id, client_uuid)
+
+            # Insert subscription, updating if it exists
+            await conn.execute('''
+                INSERT INTO subscriptions (user_id, client_email, client_uuid, sub_id, expires_at)
+                VALUES ($1, $2, $3, $4, $5)
+                ON CONFLICT (client_uuid) DO UPDATE
+                SET user_id = EXCLUDED.user_id,
+                    client_email = EXCLUDED.client_email,
+                    sub_id = EXCLUDED.sub_id,
+                    expires_at = EXCLUDED.expires_at,
+                    status = 'active'
+            ''', telegram_id, client_email, client_uuid, sub_id, expires_at)
 
 async def close_db():
     if pool:
