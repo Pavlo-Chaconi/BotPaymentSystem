@@ -9,7 +9,7 @@ import io
 
 from database.db import add_user, get_active_subscription, create_gateway_payment, get_payment_by_platega_id, update_payment_status
 from keyboards.inline import main_menu_kb, buy_menu_kb, gateway_payment_kb, back_to_main_kb, agreement_kb
-from config import SUPPORT_USERNAME
+from config import SUPPORT_EMAIL
 from services.xui_api import xui_api
 from services.payment_gateway import payment_gateway, bot_deeplink
 from services.fulfillment import fulfill_payment
@@ -55,7 +55,7 @@ async def cb_docs(callback: CallbackQuery, bot: Bot):
 @router.callback_query(F.data == "support")
 async def cb_support(callback: CallbackQuery, state: FSMContext):
     await state.clear()
-    text = f"🆘 <b>Поддержка</b>\n\nПо всем вопросам пишите: @{SUPPORT_USERNAME}"
+    text = f"🆘 <b>Поддержка</b>\n\nПо всем вопросам пишите: {SUPPORT_EMAIL}"
     await navigate_to_text(callback, text, back_to_main_kb())
     await callback.answer()
 
@@ -109,7 +109,7 @@ async def cb_tariff(callback: CallbackQuery, bot: Bot):
     if not created or not created.get("url") or not created.get("transactionId"):
         text = (
             "❌ <b>Не удалось создать платёж.</b>\n\n"
-            f"Попробуйте ещё раз чуть позже или свяжитесь с поддержкой (@{SUPPORT_USERNAME})."
+            f"Попробуйте ещё раз чуть позже или свяжитесь с поддержкой ({SUPPORT_EMAIL})."
         )
         await navigate_to_text(callback, text, back_to_main_kb())
         await callback.answer()
@@ -253,7 +253,7 @@ async def cb_help(callback: CallbackQuery, state: FSMContext):
         "2️⃣ Зайдите в «Мой профиль» и скопируйте ссылку-подписку (или отсканируйте QR-код).\n"
         "3️⃣ Вставьте ссылку в ваше приложение (в раздел Подписки / Subscriptions).\n"
         "4️⃣ Обновите подписку и подключитесь!\n\n"
-        f"💬 Возникли проблемы? Напишите поддержке: @{SUPPORT_USERNAME}"
+        f"💬 Возникли проблемы? Напишите поддержке: {SUPPORT_EMAIL}"
     )
     await navigate_to_text(callback, text, back_to_main_kb())
     await callback.answer()

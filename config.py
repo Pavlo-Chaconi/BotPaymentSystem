@@ -22,7 +22,7 @@ DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localho
 ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
 
 # Support contact (shown in "Поддержка" button)
-SUPPORT_USERNAME = os.getenv("SUPPORT_USERNAME", "leeengery")
+SUPPORT_EMAIL = os.getenv("SUPPORT_EMAIL", "aymaritaodett10@gmail.com")
 
 # Platega.io payment gateway (https://docs.platega.io/)
 PLATEGA_MERCHANT_ID = os.getenv("PLATEGA_MERCHANT_ID", "")
