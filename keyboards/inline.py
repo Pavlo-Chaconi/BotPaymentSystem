@@ -30,7 +30,7 @@ def back_to_main_kb() -> InlineKeyboardMarkup:
         [InlineKeyboardButton(text="◀️ Назад", callback_data="main_menu")]
     ])
 
-def profile_kb() -> InlineKeyboardMarkup:
+def agreement_kb() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="📄 Документы", callback_data="docs")],
         [InlineKeyboardButton(text="◀️ Назад", callback_data="main_menu")]

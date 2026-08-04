@@ -2,6 +2,7 @@ import asyncio
 import logging
 from aiohttp import web
 from aiogram import Bot, Dispatcher
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from config import BOT_TOKEN, WEBHOOK_PORT
 from database.db import init_db, close_db
 from handlers.user import router as user_router
@@ -9,6 +10,7 @@ from handlers.admin import router as admin_router
 from handlers.webhook import create_webhook_app
 from services.xui_api import xui_api
 from services.payment_gateway import payment_gateway
+from services.reminders import check_expiring_subscriptions
 import services.payment_gateway as payment_gateway_module
 
 logging.basicConfig(level=logging.INFO)
@@ -42,10 +44,15 @@ async def main():
     await site.start()
     logger.info(f"Platega webhook listening on :{WEBHOOK_PORT}/platega/webhook")
 
+    scheduler = AsyncIOScheduler()
+    scheduler.add_job(check_expiring_subscriptions, "interval", hours=6, args=[bot])
+    scheduler.start()
+
     try:
         await bot.delete_webhook(drop_pending_updates=True)
         await dp.start_polling(bot)
     finally:
+        scheduler.shutdown(wait=False)
         await runner.cleanup()
         await payment_gateway.close()
         await xui_api.close()

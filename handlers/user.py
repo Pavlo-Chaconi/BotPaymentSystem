@@ -8,7 +8,7 @@ import qrcode
 import io
 
 from database.db import add_user, get_active_subscription, create_gateway_payment, get_payment_by_platega_id, update_payment_status
-from keyboards.inline import main_menu_kb, buy_menu_kb, gateway_payment_kb, back_to_main_kb, profile_kb
+from keyboards.inline import main_menu_kb, buy_menu_kb, gateway_payment_kb, back_to_main_kb, agreement_kb
 from config import SUPPORT_USERNAME
 from services.xui_api import xui_api
 from services.payment_gateway import payment_gateway, bot_deeplink
@@ -213,7 +213,7 @@ async def cb_profile(callback: CallbackQuery, bot: Bot, state: FSMContext):
                 chat_id=callback.message.chat.id,
                 photo=photo,
                 caption=text,
-                reply_markup=profile_kb(),
+                reply_markup=back_to_main_kb(),
                 parse_mode="HTML"
             )
             await callback.answer()
@@ -222,7 +222,7 @@ async def cb_profile(callback: CallbackQuery, bot: Bot, state: FSMContext):
         text += "🔴 Статус: <b>Отсутствует</b>\n"
         text += "<i>Перейдите в меню покупок, чтобы оформить подписку.</i>\n"
 
-    await navigate_to_text(callback, text, profile_kb())
+    await navigate_to_text(callback, text, back_to_main_kb())
     await callback.answer()
 
 @router.callback_query(F.data == "locations")
@@ -270,5 +270,5 @@ async def cb_agreement(callback: CallbackQuery, state: FSMContext):
         "4. Оплачивая подписку, вы соглашаетесь с тем, что возврат средств за периоды вынужденного простоя не осуществляется.\n\n"
         "<i>Используя нашего бота, вы подтверждаете согласие с данными условиями.</i>"
     )
-    await navigate_to_text(callback, text, back_to_main_kb())
+    await navigate_to_text(callback, text, agreement_kb())
     await callback.answer()

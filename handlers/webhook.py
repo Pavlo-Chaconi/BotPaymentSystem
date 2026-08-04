@@ -43,11 +43,7 @@ def create_webhook_app(bot: Bot) -> web.Application:
             ok = await fulfill_payment(payment["id"], bot)
             if ok and ADMIN_ID:
                 try:
-                    await bot.send_message(
-                        ADMIN_ID,
-                        f"💰 Оплата подтверждена (Platega): payment #{payment['id']}, "
-                        f"user {payment['user_id']}, {payment['amount']}₽, {payment['months']} мес."
-                    )
+                    await bot.send_message(ADMIN_ID, "💰 Оплата подтверждена (Platega)")
                 except Exception:
                     pass
             if not ok:

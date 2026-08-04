@@ -43,6 +43,13 @@ async def init_db():
             await conn.execute('ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS sub_id VARCHAR(255)')
         except Exception:
             pass
+
+        # Tracks whether the "expires in ~7 days" reminder was already sent for
+        # the subscription's current expiry (reset whenever expires_at changes)
+        try:
+            await conn.execute('ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS reminder_sent BOOLEAN DEFAULT FALSE')
+        except Exception:
+            pass
             
         # Table for payments (Platega.io gateway transactions)
         await conn.execute('''
@@ -85,10 +92,15 @@ async def add_subscription(user_id: int, client_email: str, client_uuid: str, su
         ''', user_id, client_email, client_uuid, sub_id, expires_at)
 
 async def extend_subscription(user_id: int, new_expires_at):
+    # cb_profile also calls this just to sync expires_at from 3x-ui on every view,
+    # so only reset the reminder flag when the expiry actually moves — otherwise
+    # a user re-opening their profile right after a reminder would clear it and
+    # cause the reminder to resend on the next scheduler pass.
     async with pool.acquire() as conn:
         await conn.execute('''
-            UPDATE subscriptions 
-            SET expires_at = $1 
+            UPDATE subscriptions
+            SET expires_at = $1,
+                reminder_sent = CASE WHEN expires_at IS DISTINCT FROM $1 THEN FALSE ELSE reminder_sent END
             WHERE user_id = $2 AND status = 'active'
         ''', new_expires_at, user_id)
 
@@ -149,10 +161,25 @@ async def import_subscription(telegram_id: int, client_email: str, client_uuid: 
                     client_email = EXCLUDED.client_email,
                     sub_id = EXCLUDED.sub_id,
                     expires_at = EXCLUDED.expires_at,
-                    status = 'active'
+                    status = 'active',
+                    reminder_sent = FALSE
             ''', telegram_id, client_email, client_uuid, sub_id, expires_at)
 
             return len(replaced) > 0
+
+async def get_subscriptions_expiring_soon(days: int):
+    async with pool.acquire() as conn:
+        return await conn.fetch('''
+            SELECT * FROM subscriptions
+            WHERE status = 'active'
+              AND reminder_sent = FALSE
+              AND expires_at > NOW()
+              AND expires_at <= NOW() + ($1 || ' days')::interval
+        ''', str(days))
+
+async def mark_reminder_sent(subscription_id: int):
+    async with pool.acquire() as conn:
+        await conn.execute('UPDATE subscriptions SET reminder_sent = TRUE WHERE id = $1', subscription_id)
 
 async def close_db():
     if pool:
