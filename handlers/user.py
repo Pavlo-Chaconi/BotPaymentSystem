@@ -7,11 +7,12 @@ from aiogram.fsm.context import FSMContext
 import qrcode
 import io
 
-from database.db import add_user, get_active_subscription
-from keyboards.inline import main_menu_kb, buy_menu_kb, payment_kb, back_to_main_kb
-from config import ADMIN_ID, SUPPORT_USERNAME
-from utils.states import PaymentStates
+from database.db import add_user, get_active_subscription, create_gateway_payment, get_payment_by_platega_id, update_payment_status
+from keyboards.inline import main_menu_kb, buy_menu_kb, gateway_payment_kb, back_to_main_kb, profile_kb
+from config import SUPPORT_USERNAME
 from services.xui_api import xui_api
+from services.payment_gateway import payment_gateway, bot_deeplink
+from services.fulfillment import fulfill_payment
 
 router = Router()
 
@@ -28,14 +29,22 @@ async def send_docs(chat_id: int, bot: Bot):
 @router.message(CommandStart())
 async def cmd_start(message: Message, state: FSMContext, bot: Bot):
     await state.clear()
-    await add_user(message.from_user.id, message.from_user.username, message.from_user.full_name)
-    await send_docs(message.chat.id, bot)
-    welcome_text = (
-        "👋 <b>Добро пожаловать в панель управления VPN!</b>\n\n"
-        "🛡️ <i>Быстрый, безопасный и анонимный доступ к интернету.</i>\n\n"
-        "Ознакомьтесь с документами выше перед началом работы.\n"
-        "Выберите действие в меню ниже 👇"
-    )
+    is_new = await add_user(message.from_user.id, message.from_user.username, message.from_user.full_name)
+
+    if is_new:
+        await send_docs(message.chat.id, bot)
+        welcome_text = (
+            "👋 <b>Добро пожаловать в панель управления VPN!</b>\n\n"
+            "🛡️ <i>Быстрый, безопасный и анонимный доступ к интернету.</i>\n\n"
+            "Ознакомьтесь с документами выше перед началом работы.\n"
+            "Выберите действие в меню ниже 👇"
+        )
+    else:
+        welcome_text = (
+            "👋 <b>С возвращением!</b>\n\n"
+            "🛡️ <i>Быстрый, безопасный и анонимный доступ к интернету.</i>\n\n"
+            "Выберите действие в меню ниже 👇"
+        )
     await message.answer(welcome_text, reply_markup=main_menu_kb(), parse_mode="HTML")
 
 @router.callback_query(F.data == "docs")
@@ -80,83 +89,72 @@ async def cb_buy_sub(callback: CallbackQuery, state: FSMContext):
 
 @router.callback_query(F.data.startswith("tariff_"))
 async def cb_tariff(callback: CallbackQuery, bot: Bot):
-    # e.g., tariff_1_100 (1 month, 100 rub)
+    # e.g., tariff_1_250 (1 month, 250 rub)
     _, months, price = callback.data.split("_")
     months = int(months)
     price = int(price)
-    
+    user_id = callback.from_user.id
+
+    deeplink = bot_deeplink()
+    created = await payment_gateway.create_payment(
+        amount=price,
+        description=f"VPN подписка на {months} мес.",
+        payload=f"tg:{user_id}",
+        return_url=deeplink,
+        failed_url=deeplink,
+        user_id=user_id,
+        username=callback.from_user.username,
+    )
+
+    if not created or not created.get("url") or not created.get("transactionId"):
+        text = (
+            "❌ <b>Не удалось создать платёж.</b>\n\n"
+            f"Попробуйте ещё раз чуть позже или свяжитесь с поддержкой (@{SUPPORT_USERNAME})."
+        )
+        await navigate_to_text(callback, text, back_to_main_kb())
+        await callback.answer()
+        return
+
+    await create_gateway_payment(user_id, price, months, created["transactionId"])
+
     text = (
         f"📝 <b>Оформление подписки на {months} мес.</b>\n\n"
         f"💳 Сумма к оплате: <b>{price}₽</b>\n\n"
-        f"⚙️ <i>Автоматическая оплата (Platega.io) сейчас подключается.</i>\n"
-        f"Для оплаты свяжитесь с поддержкой (@{SUPPORT_USERNAME}) — вам вышлют актуальные реквизиты.\n\n"
-        "<i>После оплаты нажмите кнопку «✅ Я оплатил» и приложите чек.</i>"
+        "Нажмите «Оплатить», выберите удобный способ оплаты на странице Platega — "
+        "подписка активируется автоматически сразу после оплаты."
     )
-    
-    await navigate_to_text(callback, text, payment_kb(price, months))
+    await navigate_to_text(callback, text, gateway_payment_kb(created["url"], created["transactionId"]))
     await callback.answer()
 
-@router.callback_query(F.data.startswith("paid_"))
-async def cb_paid(callback: CallbackQuery, state: FSMContext):
-    _, amount, months = callback.data.split("_")
-    
-    await state.update_data(amount=int(amount), months=int(months))
-    await state.set_state(PaymentStates.waiting_for_receipt)
-    
-    await callback.message.edit_text(
-        "📸 Пожалуйста, отправьте фото чека или скриншот перевода ответным сообщением.",
-        reply_markup=back_to_main_kb()
-    )
-    await callback.answer()
+@router.callback_query(F.data.startswith("check_"))
+async def cb_check_payment(callback: CallbackQuery, bot: Bot):
+    transaction_id = callback.data[len("check_"):]
+    payment = await get_payment_by_platega_id(transaction_id)
 
-@router.message(PaymentStates.waiting_for_receipt, F.photo)
-async def process_receipt_photo(message: Message, state: FSMContext, bot: Bot):
-    data = await state.get_data()
-    amount = data.get("amount")
-    months = data.get("months")
-    
-    photo_file_id = message.photo[-1].file_id
-    user_id = message.from_user.id
-    
-    # We will save this payment in DB in the admin handler when creating the invoice request for admin,
-    # or save it here as 'pending' and pass the ID to admin.
-    from database.db import create_payment
-    payment_id = await create_payment(user_id, amount, months, photo_file_id)
-    
-    if ADMIN_ID != 0:
-        from keyboards.inline import admin_approval_kb
-        user_info = f"@{message.from_user.username}" if message.from_user.username else f"ID: {user_id}"
-        
-        admin_text = (
-            f"🆕 <b>Новая заявка на оплату!</b>\n\n"
-            f"👤 От: {user_info}\n"
-            f"💰 Сумма: {amount}₽\n"
-            f"📅 Срок: {months} мес.\n\n"
-            f"Проверьте чек и примите решение:"
-        )
-        try:
-            await bot.send_photo(
-                chat_id=ADMIN_ID,
-                photo=photo_file_id,
-                caption=admin_text,
-                reply_markup=admin_approval_kb(payment_id),
-                parse_mode="HTML"
+    if not payment:
+        await callback.answer("Платёж не найден.", show_alert=True)
+        return
+
+    if payment["status"] != "pending":
+        await callback.answer("Этот платёж уже обработан.", show_alert=True)
+        return
+
+    remote = await payment_gateway.get_transaction(transaction_id)
+    status = remote.get("status") if remote else None
+
+    if status == "CONFIRMED":
+        if await fulfill_payment(payment["id"], bot):
+            await callback.message.edit_text(
+                "✅ Оплата подтверждена! Подписка активирована — подробности отправлены отдельным сообщением.",
+                reply_markup=back_to_main_kb()
             )
-        except Exception as e:
-            await message.answer("❌ Ошибка при отправке администратору. Свяжитесь с поддержкой.")
-            await state.clear()
-            return
-
-    await message.answer(
-        "✅ Чек успешно отправлен на проверку!\n\n"
-        "Обычно проверка занимает от 5 до 15 минут. После проверки вы получите уведомление с ключом доступа.",
-        reply_markup=back_to_main_kb()
-    )
-    await state.clear()
-
-@router.message(PaymentStates.waiting_for_receipt)
-async def process_receipt_invalid(message: Message):
-    await message.answer("Пожалуйста, отправьте именно ФОТО чека (скриншот).")
+        else:
+            await callback.answer("Оплата подтверждена, но выдача не удалась. Свяжитесь с поддержкой.", show_alert=True)
+    elif status == "CANCELED":
+        await update_payment_status(payment["id"], "rejected")
+        await callback.answer("Платёж отменён.", show_alert=True)
+    else:
+        await callback.answer("Платёж пока не оплачен.", show_alert=True)
 
 @router.callback_query(F.data == "profile")
 async def cb_profile(callback: CallbackQuery, bot: Bot, state: FSMContext):
@@ -215,7 +213,7 @@ async def cb_profile(callback: CallbackQuery, bot: Bot, state: FSMContext):
                 chat_id=callback.message.chat.id,
                 photo=photo,
                 caption=text,
-                reply_markup=back_to_main_kb(),
+                reply_markup=profile_kb(),
                 parse_mode="HTML"
             )
             await callback.answer()
@@ -223,7 +221,23 @@ async def cb_profile(callback: CallbackQuery, bot: Bot, state: FSMContext):
     else:
         text += "🔴 Статус: <b>Отсутствует</b>\n"
         text += "<i>Перейдите в меню покупок, чтобы оформить подписку.</i>\n"
-    
+
+    await navigate_to_text(callback, text, profile_kb())
+    await callback.answer()
+
+@router.callback_query(F.data == "locations")
+async def cb_locations(callback: CallbackQuery, state: FSMContext):
+    await state.clear()
+    locations = await xui_api.get_locations()
+
+    text = "🌍 <b>Доступные локации:</b>\n\n"
+    if locations:
+        for loc in locations:
+            icon = "🟢" if loc["online"] else "🔴"
+            text += f"{icon} {loc['label']}\n"
+    else:
+        text += "<i>Не удалось получить список локаций. Попробуйте позже.</i>\n"
+
     await navigate_to_text(callback, text, back_to_main_kb())
     await callback.answer()
 

@@ -1,8 +1,11 @@
+import re
 import aiohttp
 import logging
 from config import XUI_URL, XUI_API_TOKEN
 
 logger = logging.getLogger(__name__)
+
+_FLAG_RE = re.compile(r'[\U0001F1E6-\U0001F1FF]{2}')
 
 class XuiAPI:
     def __init__(self):
@@ -79,6 +82,43 @@ class XuiAPI:
     async def list_clients(self):
         res = await self._request("GET", "/panel/api/clients/list")
         return res.get("obj", []) if res and res.get("success") else []
+
+    async def get_locations(self):
+        """One entry per distinct location (grouped by remote node, local server counted once),
+        with a display label taken from the inbound remark and an online/offline flag.
+        Purely informational — used to show users which locations are currently up."""
+        inbounds_res = await self._request("GET", "/panel/api/inbounds/options")
+        if not (inbounds_res and inbounds_res.get("success")):
+            return []
+        inbounds = [i for i in inbounds_res.get("obj", []) if i.get("enable")]
+
+        nodes_res = await self._request("GET", "/panel/api/nodes/list")
+        node_online = {}
+        if nodes_res and nodes_res.get("success"):
+            node_online = {n["id"]: n.get("status") == "online" for n in nodes_res.get("obj", [])}
+
+        locations = []
+        seen = set()
+        for ib in inbounds:
+            node_id = ib.get("nodeId")
+            key = node_id or "local"
+            if key in seen:
+                continue
+            seen.add(key)
+
+            remark = (ib.get("remark") or "").strip()
+            flag_match = _FLAG_RE.search(remark)
+            remainder = (remark[flag_match.end():] if flag_match else remark).strip(" -")
+            if "|" in remainder:
+                remainder = remainder.split("|")[-1].strip()
+            for noise in ("Vless", "Hysteria", "Сот.Связь", "Сотовая связь", "Для дом.Интернета"):
+                remainder = remainder.replace(noise, "").strip()
+            remainder = re.sub(r"\s+", " ", remainder).strip(" -")
+            label = f"{flag_match.group(0)} {remainder}".strip() if flag_match else (remainder or remark)
+            online = True if node_id is None else node_online.get(node_id, False)
+            locations.append({"label": label or f"Inbound {ib.get('id')}", "online": online})
+
+        return locations
 
     async def close(self):
         if self.session and not self.session.closed:

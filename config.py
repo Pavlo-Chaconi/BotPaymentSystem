@@ -24,5 +24,10 @@ ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
 # Support contact (shown in "Поддержка" button)
 SUPPORT_USERNAME = os.getenv("SUPPORT_USERNAME", "leeengery")
 
-# ponytail: Platega.io integration deferred — add PLATEGA_SHOP_ID/PLATEGA_SECRET_KEY
-# here and a services/payment_gateway.py once we have API docs/creds.
+# Platega.io payment gateway (https://docs.platega.io/)
+PLATEGA_MERCHANT_ID = os.getenv("PLATEGA_MERCHANT_ID", "")
+PLATEGA_SECRET_KEY = os.getenv("PLATEGA_SECRET_KEY", "")
+# Public HTTPS URL Platega POSTs payment-status callbacks to (registered in their dashboard too)
+PLATEGA_CALLBACK_URL = os.getenv("PLATEGA_CALLBACK_URL", "")
+# Local port our aiohttp app listens on for that callback (proxied by Caddy)
+WEBHOOK_PORT = int(os.getenv("WEBHOOK_PORT", "8080"))

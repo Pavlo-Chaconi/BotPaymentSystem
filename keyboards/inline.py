@@ -4,8 +4,9 @@ def main_menu_kb() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="💳 Тарифы", callback_data="buy_sub")],
         [InlineKeyboardButton(text="👤 Мой профиль", callback_data="profile")],
+        [InlineKeyboardButton(text="🌍 Локации", callback_data="locations")],
         [InlineKeyboardButton(text="ℹ️ Помощь", callback_data="help"), InlineKeyboardButton(text="🆘 Поддержка", callback_data="support")],
-        [InlineKeyboardButton(text="📜 Соглашение", callback_data="agreement"), InlineKeyboardButton(text="📄 Документы", callback_data="docs")]
+        [InlineKeyboardButton(text="📜 Соглашение", callback_data="agreement")]
     ])
 
 def buy_menu_kb() -> InlineKeyboardMarkup:
@@ -17,21 +18,19 @@ def buy_menu_kb() -> InlineKeyboardMarkup:
         [InlineKeyboardButton(text="◀️ Назад", callback_data="main_menu")]
     ])
 
-def payment_kb(amount: int, months: int) -> InlineKeyboardMarkup:
+def gateway_payment_kb(pay_url: str, transaction_id: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="✅ Я оплатил", callback_data=f"paid_{amount}_{months}")],
-        [InlineKeyboardButton(text="Отмена", callback_data="main_menu")]
-    ])
-
-def admin_approval_kb(payment_id: int) -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(inline_keyboard=[
-        [
-            InlineKeyboardButton(text="✅ Подтвердить", callback_data=f"admin_approve_{payment_id}"),
-            InlineKeyboardButton(text="❌ Отклонить", callback_data=f"admin_reject_{payment_id}")
-        ]
+        [InlineKeyboardButton(text="💳 Оплатить", url=pay_url)],
+        [InlineKeyboardButton(text="🔄 Проверить статус", callback_data=f"check_{transaction_id}")],
+        [InlineKeyboardButton(text="◀️ Назад", callback_data="main_menu")]
     ])
 
 def back_to_main_kb() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="◀️ Назад", callback_data="main_menu")]
+    ])
+
+def profile_kb() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="📄 Документы", callback_data="docs")],
         [InlineKeyboardButton(text="◀️ Назад", callback_data="main_menu")]
