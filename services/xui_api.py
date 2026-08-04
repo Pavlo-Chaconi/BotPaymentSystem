@@ -83,6 +83,15 @@ class XuiAPI:
         res = await self._request("GET", "/panel/api/clients/list")
         return res.get("obj", []) if res and res.get("success") else []
 
+    async def find_client(self, token: str):
+        """Finds a client by subId or email (there's no direct lookup-by-subId
+        endpoint, so this scans the full client list). Returns the client dict or None."""
+        clients = await self.list_clients()
+        for client in clients:
+            if token and (client.get("subId") == token or client.get("email") == token):
+                return client
+        return None
+
     async def get_locations(self):
         """One entry per distinct location (grouped by remote node, local server counted once),
         with a display label taken from the inbound remark and an online/offline flag.

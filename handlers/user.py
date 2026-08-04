@@ -7,12 +7,16 @@ from aiogram.fsm.context import FSMContext
 import qrcode
 import io
 
-from database.db import add_user, get_active_subscription, create_gateway_payment, get_payment_by_platega_id, update_payment_status
-from keyboards.inline import main_menu_kb, buy_menu_kb, gateway_payment_kb, back_to_main_kb, agreement_kb
-from config import SUPPORT_EMAIL
+from database.db import (
+    add_user, get_active_subscription, create_gateway_payment, get_payment_by_platega_id,
+    update_payment_status, get_subscription_by_client_uuid, import_subscription,
+)
+from keyboards.inline import main_menu_kb, buy_menu_kb, gateway_payment_kb, back_to_main_kb, agreement_kb, no_subscription_kb
+from config import SUPPORT_EMAIL, ADMIN_ID
 from services.xui_api import xui_api
 from services.payment_gateway import payment_gateway, bot_deeplink
 from services.fulfillment import fulfill_payment
+from utils.states import RestoreStates
 
 router = Router()
 
@@ -220,10 +224,74 @@ async def cb_profile(callback: CallbackQuery, bot: Bot, state: FSMContext):
             return
     else:
         text += "🔴 Статус: <b>Отсутствует</b>\n"
-        text += "<i>Перейдите в меню покупок, чтобы оформить подписку.</i>\n"
+        text += "<i>Оформите новую подписку или восстановите уже купленную по ссылке.</i>\n"
+        await navigate_to_text(callback, text, no_subscription_kb())
+        await callback.answer()
+        return
 
     await navigate_to_text(callback, text, back_to_main_kb())
     await callback.answer()
+
+@router.callback_query(F.data == "restore_sub")
+async def cb_restore_sub(callback: CallbackQuery, state: FSMContext):
+    await state.set_state(RestoreStates.waiting_for_key)
+    await navigate_to_text(
+        callback,
+        "🔄 <b>Восстановление подписки</b>\n\n"
+        "Пришлите ссылку-подписку (или её код) следующим сообщением — я найду её и привяжу к вашему аккаунту.",
+        back_to_main_kb()
+    )
+    await callback.answer()
+
+@router.message(RestoreStates.waiting_for_key, F.text)
+async def process_restore_key(message: Message, state: FSMContext, bot: Bot):
+    await state.clear()
+    user_id = message.from_user.id
+
+    token = message.text.strip().rstrip("/").split("/")[-1].split("?")[0]
+    client = await xui_api.find_client(token)
+
+    if not client:
+        await message.answer(
+            "❌ Не нашёл подписку по этой ссылке/коду. Проверьте и попробуйте ещё раз, "
+            f"либо напишите в поддержку ({SUPPORT_EMAIL}).",
+            reply_markup=back_to_main_kb()
+        )
+        return
+
+    client_uuid = client["uuid"]
+    existing = await get_subscription_by_client_uuid(client_uuid)
+
+    if existing and existing["user_id"] != user_id:
+        await message.answer(
+            "❌ Эта подписка уже привязана к другому аккаунту. "
+            f"Если это ошибка — напишите в поддержку ({SUPPORT_EMAIL}).",
+            reply_markup=back_to_main_kb()
+        )
+        return
+
+    if existing and existing["user_id"] == user_id and existing["status"] == "active":
+        await message.answer("ℹ️ Эта подписка уже привязана к вашему аккаунту.", reply_markup=back_to_main_kb())
+        return
+
+    expiry_ms = client.get("expiryTime", 0)
+    expires_at = datetime.fromtimestamp(expiry_ms / 1000.0) if expiry_ms > 0 else datetime.now() + timedelta(days=3650)
+
+    await import_subscription(user_id, client["email"], client_uuid, client.get("subId", ""), expires_at)
+
+    if ADMIN_ID:
+        try:
+            await bot.send_message(ADMIN_ID, f"🔄 Восстановлена подписка: user {user_id} <-> {client['email']}")
+        except Exception:
+            pass
+
+    await message.answer(
+        "✅ <b>Подписка восстановлена и привязана к вашему аккаунту!</b>\n\n"
+        f"Дата окончания: <b>{expires_at.strftime('%d.%m.%Y %H:%M')}</b>\n\n"
+        "Подробности — в разделе «👤 Мой профиль».",
+        reply_markup=back_to_main_kb(),
+        parse_mode="HTML"
+    )
 
 @router.callback_query(F.data == "locations")
 async def cb_locations(callback: CallbackQuery, state: FSMContext):

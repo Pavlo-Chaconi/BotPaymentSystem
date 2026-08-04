@@ -25,6 +25,13 @@ def gateway_payment_kb(pay_url: str, transaction_id: str) -> InlineKeyboardMarku
         [InlineKeyboardButton(text="◀️ Назад", callback_data="main_menu")]
     ])
 
+def no_subscription_kb() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="💳 Тарифы", callback_data="buy_sub")],
+        [InlineKeyboardButton(text="🔄 Восстановить подписку", callback_data="restore_sub")],
+        [InlineKeyboardButton(text="◀️ Назад", callback_data="main_menu")]
+    ])
+
 def back_to_main_kb() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="◀️ Назад", callback_data="main_menu")]

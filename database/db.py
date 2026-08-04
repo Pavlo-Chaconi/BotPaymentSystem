@@ -167,6 +167,10 @@ async def import_subscription(telegram_id: int, client_email: str, client_uuid: 
 
             return len(replaced) > 0
 
+async def get_subscription_by_client_uuid(client_uuid: str):
+    async with pool.acquire() as conn:
+        return await conn.fetchrow('SELECT * FROM subscriptions WHERE client_uuid = $1', client_uuid)
+
 async def get_subscriptions_expiring_soon(days: int):
     async with pool.acquire() as conn:
         return await conn.fetch('''
